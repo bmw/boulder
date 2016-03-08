@@ -69,6 +69,7 @@ def start(race_detection):
         'boulder-ca',
         'boulder-va',
         'boulder-publisher',
+        'mailcatch',
         'ocsp-updater',
         'ocsp-responder',
         'ct-test-srv',

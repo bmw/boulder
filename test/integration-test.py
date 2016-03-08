@@ -2,6 +2,7 @@
 import argparse
 import atexit
 import base64
+import datetime
 import json
 import os
 import re
@@ -18,6 +19,7 @@ import startservers
 
 ISSUANCE_FAILED = 1
 REVOCATION_FAILED = 2
+MAILER_FAILED = 3
 
 class ExitStatus:
     OK, PythonFailure, NodeFailure, Error, OCSPFailure, CTFailure, IncorrectCommandLineArgs = range(7)
@@ -147,6 +149,17 @@ def wait_for_ocsp_good(cert_file, issuer_file, url):
 def wait_for_ocsp_revoked(cert_file, issuer_file, url):
     fetch_until(cert_file, issuer_file, url, ": good", ": revoked")
 
+def get_expiry_time(cert_file):
+    try:
+        output = subprocess.check_output(["openssl", "x509", "-enddate", "-noout", "-in", cert_file])
+    except subprocess.CalledProcessError as e:
+        output = e.output
+        print output
+        print "subprocess returned non-zero: %s" % e
+        die(ExitStatus.NodeFailure)
+
+    return datetime.datetime.strptime(output.split('\n')[0].split('=')[1], '%b %d %H:%M:%S %Y %Z')
+
 def verify_ct_submission(expectedSubmissions, url):
     resp = urllib2.urlopen(url)
     submissionStr = resp.read()
@@ -159,13 +172,14 @@ def run_node_test(domain, chall_type, expected_ct_submissions):
     cert_file = os.path.join(tempdir, "cert.der")
     cert_file_pem = os.path.join(tempdir, "cert.pem")
     key_file = os.path.join(tempdir, "key.pem")
+    email_addr = "js.integration.test@letsencrypt.org"
     # Issue the certificate and transform it from DER-encoded to PEM-encoded.
     if subprocess.Popen('''
-        node test.js --email foo@letsencrypt.org --agree true \
+        node test.js --email %s --agree true \
           --domains %s --new-reg http://localhost:4000/acme/new-reg \
           --certKey %s --cert %s --challType %s && \
         openssl x509 -in %s -out %s -inform der -outform pem
-        ''' % (domain, key_file, cert_file, chall_type, cert_file, cert_file_pem),
+        ''' % (email_addr, domain, key_file, cert_file, chall_type, cert_file, cert_file_pem),
         shell=True).wait() != 0:
         print("\nIssuing failed")
         return ISSUANCE_FAILED
@@ -182,6 +196,16 @@ def run_node_test(domain, chall_type, expected_ct_submissions):
     wait_for_ocsp_good("../test-ca.pem", "../test-root.pem", issuer_ocsp_url)
 
     verify_ct_submission(expected_ct_submissions, "http://localhost:4500/submissions")
+
+    # Check that the expiration mailer sends a reminder
+    before_expire = get_expiry_time(cert_file_pem) + datetime.timedelta(days=-3.1)
+    if subprocess.Popen('''
+        curl -X POST http://localhost:9381/clear && \
+        ( cd ../.. ; FAKECLOCK=`date -d '%s'` ./bin/expiration-mailer --config test/boulder-config.json ) && \
+        curl http://localhost:9381/count?to=%s | grep 1
+        ''' % (before_expire.isoformat(), email_addr), shell=True).wait() != 0:
+        print("\nExpiry mailer failed")
+        return MAILER_FAILED
 
     if subprocess.Popen('''
         node revoke.js %s %s http://localhost:4000/acme/revoke-cert
