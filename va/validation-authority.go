@@ -167,7 +167,7 @@ func (va *ValidationAuthorityImpl) fetchHTTP(ctx context.Context, identifier cor
 	va.log.AuditErr(fmt.Errorf("Attempting to validate %s for %s", challenge.Type, url))
 	httpRequest, err := http.NewRequest("GET", url.String(), nil)
 	if err != nil {
-		va.log.Debug(fmt.Sprintf("[va-err-log] Failed to parse URL '%s'. Err=%#v", identifier, err))
+		va.log.Debug(fmt.Sprintf("[va-err-log] Failed to parse URL '%s'. ErrType=%#v ErrStr=%s", identifier, err, err))
 		return nil, nil, &probs.ProblemDetails{
 			Type:   probs.MalformedProblem,
 			Detail: "URL provided for HTTP was invalid",
@@ -254,7 +254,7 @@ func (va *ValidationAuthorityImpl) fetchHTTP(ctx context.Context, identifier cor
 	}
 	httpResponse, err := client.Do(httpRequest)
 	if err != nil {
-		va.log.Debug(fmt.Sprintf("[va-err-log] HTTP request to %s failed. Err=%#v", url, err))
+		va.log.Debug(fmt.Sprintf("[va-err-log] HTTP request to %s failed. ErrType=%#v ErrStr=%s", url, err, err))
 		return nil, validationRecords, &probs.ProblemDetails{
 			Type:   parseHTTPConnError(err),
 			Detail: fmt.Sprintf("Could not connect to %s", url),
@@ -273,7 +273,7 @@ func (va *ValidationAuthorityImpl) fetchHTTP(ctx context.Context, identifier cor
 
 	body, err := ioutil.ReadAll(httpResponse.Body)
 	if err != nil {
-		va.log.Debug(fmt.Sprintf("[va-err-log] Error reading HTTP response body. Err=%#v", err))
+		va.log.Debug(fmt.Sprintf("[va-err-log] Error reading HTTP response body. ErrType=%#v ErrStr=%s", err, err))
 		return nil, validationRecords, &probs.ProblemDetails{
 			Type:   probs.UnauthorizedProblem,
 			Detail: fmt.Sprintf("Error reading HTTP response body: %v", err),
@@ -306,7 +306,7 @@ func (va *ValidationAuthorityImpl) validateTLSWithZName(ctx context.Context, ide
 	})
 
 	if err != nil {
-		va.log.Debug(fmt.Sprintf("[va-err-log] tls01 connection failure for %s. Err=%#v", identifier, err))
+		va.log.Debug(fmt.Sprintf("[va-err-log] tls01 connection failure for %s. ErrType=%#v ErrStr=%s", identifier, err, err))
 		return validationRecords, &probs.ProblemDetails{
 			Type:   parseHTTPConnError(err),
 			Detail: "Failed to connect to host for DVSNI challenge",
@@ -358,7 +358,7 @@ func (va *ValidationAuthorityImpl) validateHTTP01(ctx context.Context, identifie
 	// Parse body as a key authorization object
 	serverKeyAuthorization, authErr := core.NewKeyAuthorizationFromString(payload)
 	if authErr != nil {
-		va.log.Debug(fmt.Sprintf("[va-err-log] couldn't parse KeyAuthorization from response from %s. Err=%#v", identifier, authErr))
+		va.log.Debug(fmt.Sprintf("[va-err-log] couldn't parse KeyAuthorization from response from %s. ErrType=%#v ErrStr=%s", identifier, authErr, authErr))
 		return validationRecords, &probs.ProblemDetails{
 			Type:   probs.UnauthorizedProblem,
 			Detail: fmt.Sprintf("Error parsing key authorization file: %s", authErr.Error()),
@@ -438,7 +438,7 @@ func (va *ValidationAuthorityImpl) validateDNS01(ctx context.Context, identifier
 	txts, authorities, err := va.DNSResolver.LookupTXT(ctx, challengeSubdomain)
 
 	if err != nil {
-		va.log.Debug(fmt.Sprintf("[va-err-log] Failed to lookup txt records for %s. Err=%#v", identifier, err))
+		va.log.Debug(fmt.Sprintf("[va-err-log] Failed to lookup txt records for %s. ErrType=%#v ErrStr=%s", identifier, err, err))
 
 		return nil, bdns.ProblemDetailsFromDNSError(err)
 	}
