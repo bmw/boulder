@@ -69,11 +69,11 @@ def start(race_detection):
         'boulder-ca',
         'boulder-va',
         'boulder-publisher',
-        'mailcatch',
         'ocsp-updater',
         'ocsp-responder',
         'ct-test-srv',
-        'dns-test-srv'
+        'dns-test-srv',
+        'mail-test-srv'
     ]
     if not install(race_detection):
         return False
